@@ -1,10 +1,10 @@
 /*
-
-Purpose: This script facilitates the migration of database objects from SQL Server to Oracle databases, a prerequisite for SQL Server to Oracle data migration projects.
+Script type: TSQL Script for SQL Server
+Purpose:     This script facilitates the migration of database objects from SQL Server to Oracle databases, a prerequisite for SQL Server to Oracle data migration projects.
 Description: The script automates the generation of PL/SQL sequences and triggers for both primary and corresponding historical tables in Oracle, 
-	aiming to streamline the migration process. By accepting the table name as an input parameter from SQL Server, this stored procedure simplifies the creation of PL/SQL scripts. 
-	These scripts are intended for direct execution on an Oracle database, following any necessary modifications.
-Author: Reneesh Prabha ,2010
+	     aiming to streamline the migration process. By accepting the table name as an input parameter from SQL Server, this stored procedure simplifies the creation of PL/SQL scripts. 
+	     These scripts are intended for direct execution on an Oracle database, following any necessary modifications.
+Author:      Reneesh Prabha ,2010
 
 */
 
@@ -68,5 +68,3 @@ BEGIN
 	PRINT ''
 	PRINT UPPER(@LOCAL_SEQHX)
 END
-
-
