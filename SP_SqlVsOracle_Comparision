@@ -1,0 +1,119 @@
+/*
+
+Purpose: This stored procedure is a crucial component of the SQL Server to Oracle database migration process.
+Description: The script serves the purpose of comparing table schemas between SQL Server and corresponding Oracle databases. 
+It facilitates schema comparison post-migration to ensure consistency and accuracy between the two environments.
+Prerequisite: This script requires linked servers to establish connections from the SQL Server database to the Oracle database.
+Author: Reneesh Prabha, 2010
+
+*/
+CREATE PROCEDURE [dbo].[SP_SqlVsOracle_Comparision] AS
+BEGIN
+
+	--Prerequisite:   EXEC sp_addlinkedsrvlogin 'MYDBOracle', FALSE, Null, 'MYDB', 'MYDB'
+
+	--Get user table list from Oracle DB into a temp table: OracleSchema
+	IF EXISTS (SELECT 1 FROM SYSOBJECTS WHERE NAME ='OracleSchema')
+		DROP TABLE OracleSchema	
+	SELECT  * INTO    OracleSchema
+	FROM    OPENQUERY(MYDBOracle,'
+	SELECT * FROM USER_TABLES_COLUMNS where table_name in (
+		select table_name from USER_TABLES 
+		where  TABLE_NAME NOT LIKE ''MD%'' AND TABLE_NAME NOT LIKE ''PLSQL%'' AND  TABLE_NAME NOT LIKE ''PLAN%''
+	) 
+	order by table_name,column_id') ;
+
+	--	--Get user table list from SQL Server DB into a temp table: OracleSchema
+	IF EXISTS (SELECT 1 FROM SYSOBJECTS WHERE NAME ='SqlSchema')
+		DROP TABLE SqlSchema 
+	SELECT  * INTO    SqlSchema
+	FROM    MYDB.information_schema.columns  WHERE table_name not in ('OracleSchema') 
+	ORDER BY table_name,Ordinal_position 
+
+	--Find columns exist only in SQL
+	SELECT DISTINCT
+			s.table_name, 
+			s.column_name AS 'Columns exist only in SQL'
+	FROM    SqlSchema s
+	WHERE   NOT EXISTS ( SELECT 1 FROM   OracleSchema o --excluding oracle tables
+						 WHERE  s.table_name = o.table_name
+								AND s.column_name = o.column_name )
+
+	--Find columns exist only in Oracle
+	SELECT DISTINCT
+			o.table_name,
+			o.column_name AS 'Columns exist only in Oracle'
+	FROM    OracleSchema o
+	WHERE   NOT EXISTS ( SELECT 1  FROM   SqlSchema s  --excluding sql tables
+						 WHERE  o.table_name = s.table_name AND o.column_name = s.column_name )
+
+	--COMMON TABLES
+	IF EXISTS (SELECT 1 FROM TEMPDB..SYSOBJECTS WHERE NAME LIKE '#COMMONTABLES%')
+		DROP TABLE #COMMONTABLES
+	
+	SELECT  O.TABLE_NAME AS ORA_TABLE_NAME,
+			O.COLUMN_NAME AS ORA_COLUMN_NAME,
+			O.DATA_TYPE AS ORA_DATA_TYPE ,
+			O.DATA_LENGTH AS ORA_DATA_LENGTH,
+			S.TABLE_NAME AS SQL_TABLE_NAME,
+			S.COLUMN_NAME AS SQL_COLUMN_NAME,
+			S.DATA_TYPE AS SQL_DATA_TYPE,
+			S.CHARACTER_MAXIMUM_LENGTH AS SQL_DATA_LENGTH 
+	INTO #COMMONTABLES
+	FROM    OracleSchema O
+			INNER JOIN SQLschema S ON O.Table_name = S.Table_name AND O.column_name = S.Column_name
+	ORDER BY O.Table_name
+
+	IF EXISTS (SELECT 1 FROM TEMPDB..SYSOBJECTS WHERE NAME LIKE'#compare%')
+	DROP TABLE #compare
+
+	SELECT  ORA_TABLE_NAME,
+			ORA_COLUMN_NAME,
+			CASE ORA_DATA_TYPE
+			  WHEN 'varchar2' THEN 'varchar'
+			  WHEN 'clob' THEN 'varchar'
+			  WHEN 'NUMBER' THEN 'numeric'
+			  WHEN 'DATE' THEN 'datetime'
+			  WHEN 'char' THEN 'char'
+			  WHEN 'BLOB' THEN 'varbinary'
+			  WHEN 'FLOAT' THEN 'float'
+			  WHEN 'NCHAR' THEN 'nchar'
+			  WHEN 'NCLOB' THEN 'nvarchar'
+			  WHEN 'NVARCHAR2' THEN 'nvarchar'
+			  WHEN 'RAW' THEN 'raw'
+			  WHEN 'UNDEFINED' THEN 'UNDEFINED'
+			END AS ORA_DATA_TYPE,
+			ora_data_length,
+			SQL_TABLE_NAME,
+			SQL_COLUMN_NAME,
+			SQL_DATA_TYPE,
+			SQL_DATA_LENGTH
+	INTO    #compare
+	FROM    #COMMONTABLES
+	WHERE   ora_table_name IS NOT NULL
+
+
+	--Comparing data type and size
+	SELECT  a.ora_table_name AS tableame,
+			a.ora_column_name AS columnname,
+			CASE a.ora_data_type
+			  WHEN 'varchar' THEN 'varchar2'
+			  WHEN 'numeric' THEN 'NUMBER'
+			  WHEN 'datetime' THEN 'DATE'
+			  WHEN 'char' THEN 'char'
+			  WHEN 'FLOAT' THEN 'float'
+			  WHEN 'NCHAR' THEN 'nchar'
+			  WHEN 'nvarchar' THEN 'NVARCHAR2'
+			  WHEN 'RAW' THEN 'raw'
+			  WHEN 'UNDEFINED' THEN 'UNDEFINED'
+			END AS oracle_data_type,
+			a.sql_data_type,
+			a.ora_data_length,
+			a.sql_data_length
+	FROM    #compare a
+			JOIN #compare b ON a.ora_table_name = b.ora_table_name AND a.ora_column_name = b.ora_column_name
+	WHERE   ( a.ora_data_type <> b.sql_data_type  OR a.ora_data_length <> b.sql_data_length )
+			AND ( a.ora_data_length <> 4000 AND a.sql_data_length <> -1 )
+			AND a.sql_data_length IS NOT NULL
+
+END
