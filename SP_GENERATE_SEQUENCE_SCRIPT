@@ -1,0 +1,72 @@
+/*
+
+Purpose: This script facilitates the migration of database objects from SQL Server to Oracle databases, a prerequisite for SQL Server to Oracle data migration projects.
+Description: The script automates the generation of PL/SQL sequences and triggers for both primary and corresponding historical tables in Oracle, 
+	aiming to streamline the migration process. By accepting the table name as an input parameter from SQL Server, this stored procedure simplifies the creation of PL/SQL scripts. 
+	These scripts are intended for direct execution on an Oracle database, following any necessary modifications.
+Author: Reneesh Prabha ,2010
+
+*/
+
+create PROCEDURE [dbo].[sp_generate_script]
+(
+	@V_TABLENAME VARCHAR (MAX),
+	@V_PKIDN VARCHAR (MAX),
+	@V_IDN VARCHAR (MAX),
+	@V_PKCD VARCHAR (MAX)
+)
+AS
+--  exec sp_generate_script 'tablename','pkidn' ,'',''
+--  example:
+--  EXEC DBO.sp_generate_script 'code_education_material_type','education_material_type_idn','',''
+
+BEGIN
+
+	DECLARE @LOCAL VARCHAR (MAX),@TABLENAME VARCHAR (MAX),@PKIDN VARCHAR (MAX),@IDN VARCHAR (MAX),@PKCD VARCHAR (MAX),@LOCAL_SEQ VARCHAR(MAX),@LOCAL_SEQHX VARCHAR(MAX)
+	SET @TABLENAME=@V_TABLENAME
+	SET @PKIDN=@V_PKIDN
+	--SET @IDN ='IDN'
+	--SET @PKCD='ADMIT_TYPE_CD'
+
+	/*SET @LOCAL='MERGE INTO '+ @TABLENAME  +' A
+	USING (SELECT * FROM ( SELECT ROW_NUMBER() OVER ( PARTITION BY '+ @TABLENAME + '.@PKIDN ORDER BY '+ @TABLENAME+'.'+@PKCD+'  ) '+@IDN+',
+								  '+ @TABLENAME+ '.'+@PKCD+' 
+						   FROM '+@TABLENAME+'  )) C 
+	ON (  A.'+@PKCD+' = C.'+@PKCD+' )
+	WHEN MATCHED THEN UPDATE SET admit_type_idn = C.'+@IDN+';'
+
+	PRINT @LOCAL
+	*/
+	
+	SET @LOCAL_SEQ='CREATE SEQUENCE S_'+@TABLENAME  +'
+	START WITH 1
+	MAXVALUE 999999999999999999999999999
+	MINVALUE 1
+	NOCYCLE
+	CACHE 20
+	NOORDER;  
+
+	CREATE OR REPLACE TRIGGER TS_'+ @TABLENAME +'  BEFORE INSERT ON '+ @TABLENAME +' FOR EACH ROW DECLARE V_NEWVAL NUMBER(12) := 0;
+	BEGIN IF INSERTING AND :NEW.'+@PKIDN+'  IS NULL THEN  SELECT S_'+@TABLENAME +'.NEXTVAL INTO V_NEWVAL FROM DUAL;
+	:NEW.'+@PKIDN+'  := V_NEWVAL; END IF; END;
+	/'
+
+	SET @LOCAL_SEQHX='CREATE SEQUENCE S_'+@TABLENAME+'_HX
+	START WITH 1
+	MAXVALUE 999999999999999999999999999
+	MINVALUE 1
+	NOCYCLE
+	CACHE 20
+	NOORDER;  
+
+	CREATE OR REPLACE TRIGGER THS_'+@TABLENAME+'_hx  BEFORE INSERT ON '+@TABLENAME+'_hx FOR EACH ROW DECLARE V_NEWVAL NUMBER(12) := 0;
+	BEGIN IF INSERTING AND :NEW.HX_IDN IS NULL THEN  SELECT S_'+@TABLENAME+'_hx.NEXTVAL INTO V_NEWVAL FROM DUAL;
+	:NEW.HX_IDN := V_NEWVAL; END IF; END;
+	/'
+
+	PRINT UPPER(@LOCAL_SEQ)
+	PRINT ''
+	PRINT UPPER(@LOCAL_SEQHX)
+END
+
+
