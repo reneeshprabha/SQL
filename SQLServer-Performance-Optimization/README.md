@@ -1,19 +1,19 @@
 # SQL Server Performance Optimization Project 1
 
-## 🧩 Overview
+## Overview
 This project demonstrates how indexing and query optimization can dramatically improve performance in SQL Server.  
 A financial institution’s core banking application was slowed down due to a full table scan on a large transaction table.  
 
-## 🚀 Goal
+## Goal
 Optimize the query by analyzing the execution plan and adding an appropriate index.
 
-## 🧰 Tools Used
+## Tools Used
 - Microsoft SQL Server
 - SQL Server Management Studio (SSMS)
 - Query Execution Plans
 - DMVs
 
-## 📂 Project Files
+## Project Files
 | File | Description |
 |------|--------------|
 | 1_Create_Schema.sql | Creates the Transactions table and sample data |
@@ -23,7 +23,7 @@ Optimize the query by analyzing the execution plan and adding an appropriate ind
 | Problem_Statement.md | Describes the real-world issue |
 | Report | Contains detailed report and screenshots |
 
-## ⚡ Results
+## Results
 - Query execution time reduced from several seconds to milliseconds.
 - Logical reads and CPU usage significantly dropped.
 - Improved transaction processing performance.
